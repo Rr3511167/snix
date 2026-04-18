@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Discussions
+    url: https://github.com/SamNet-dev/snix/discussions
+    about: Open-ended questions, ideas, show-and-tell. Faster response than Issues.

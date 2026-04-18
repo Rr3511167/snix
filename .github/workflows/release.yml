@@ -1,0 +1,173 @@
+name: Release
+
+# Triggers:
+#   - push a tag v*.*.* to produce a full release (binaries + installers + signatures)
+#   - workflow_dispatch to dry-run against a commit without publishing
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create releases + upload assets
+
+jobs:
+  build:
+    name: build ${{ matrix.goos }}/${{ matrix.goarch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { goos: linux,   goarch: amd64,  ext: "",   archive: tar.gz }
+          - { goos: linux,   goarch: arm64,  ext: "",   archive: tar.gz }
+          - { goos: linux,   goarch: arm,    goarm: 7,  ext: "",   archive: tar.gz, suffix: armv7 }
+          - { goos: windows, goarch: amd64,  ext: .exe, archive: zip    }
+          - { goos: darwin,  goarch: amd64,  ext: "",   archive: tar.gz }
+          - { goos: darwin,  goarch: arm64,  ext: "",   archive: tar.gz }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache: true
+
+      - name: Compute version
+        id: version
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=0.0.0-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build
+        id: build
+        env:
+          GOOS:   ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          GOARM:  ${{ matrix.goarm }}
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          ARCH_SUFFIX="${{ matrix.goarch }}"
+          if [[ -n "${{ matrix.suffix }}" ]]; then
+            ARCH_SUFFIX="${{ matrix.suffix }}"
+          fi
+          NAME="snix-${{ matrix.goos }}-${ARCH_SUFFIX}"
+          go build -trimpath \
+            -ldflags="-s -w -X main.version=${{ steps.version.outputs.version }}" \
+            -o "dist/snix${{ matrix.ext }}" ./cmd/snix
+          cp LICENSE "dist/"
+          cp README.md "dist/"
+          # Windows ships WinDivert alongside the binary.
+          if [[ "${{ matrix.goos }}" == "windows" ]]; then
+            cp third_party/windivert/WinDivert.dll    "dist/"
+            cp third_party/windivert/WinDivert64.sys  "dist/"
+          fi
+          cd dist
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
+            zip -r "../${NAME}.zip" .
+            ARTIFACT="${NAME}.zip"
+          else
+            tar -czf "../${NAME}.tar.gz" .
+            ARTIFACT="${NAME}.tar.gz"
+          fi
+          # Expose the archive filename to later steps via step output.
+          # (GITHUB_ENV also works but the static analyser does not resolve
+          # it; step outputs are verified by the linter.)
+          echo "artifact=${ARTIFACT}" >> "$GITHUB_OUTPUT"
+
+      - name: SHA256
+        run: sha256sum "${{ steps.build.outputs.artifact }}" > "${{ steps.build.outputs.artifact }}.sha256"
+
+      # Minisign signature using a key stored as a repo secret.
+      # If MINISIGN_KEY is absent (fork without secrets) we skip silently.
+      - name: Minisign
+        env:
+          MINISIGN_KEY: ${{ secrets.MINISIGN_KEY }}
+          MINISIGN_PASSWORD: ${{ secrets.MINISIGN_PASSWORD }}
+        run: |
+          if [[ -z "$MINISIGN_KEY" ]]; then
+            echo "MINISIGN_KEY secret not set — skipping signing"
+            exit 0
+          fi
+          echo "$MINISIGN_KEY" > minisign.key
+          sudo apt-get update -qq && sudo apt-get install -yq minisign
+          echo "$MINISIGN_PASSWORD" | minisign -Sm "${{ steps.build.outputs.artifact }}" -s minisign.key
+          rm minisign.key
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snix-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.suffix && format('-{0}', matrix.suffix) || '' }}
+          path: |
+            ${{ steps.build.outputs.artifact }}
+            ${{ steps.build.outputs.artifact }}.sha256
+            ${{ steps.build.outputs.artifact }}.minisig
+          if-no-files-found: warn
+
+  windows-installer:
+    name: build Windows installer
+    needs: build
+    runs-on: windows-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compute version
+        id: version
+        shell: bash
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: snix-windows-amd64
+          path: artifacts
+      - name: Stage files for Inno Setup
+        shell: bash
+        run: |
+          mkdir -p dist
+          cd artifacts
+          unzip -o "snix-windows-amd64.zip" -d ../dist
+      - name: Install Inno Setup
+        run: choco install innosetup -y --no-progress
+      - name: Compile installer
+        shell: cmd
+        run: |
+          "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" ^
+            /DMyAppVersion=${{ steps.version.outputs.version }} ^
+            installer\windows\snix.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: snix-windows-installer
+          path: dist/snix-setup-*.exe
+
+  release:
+    name: publish release
+    needs: [build, windows-installer]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV=$(git tag --sort=-version:refname | grep -v "${GITHUB_REF#refs/tags/}" | head -n1)
+          if [[ -z "$PREV" ]]; then
+            git log --pretty=format:'- %s (%h)' > CHANGELOG.md
+          else
+            git log --pretty=format:'- %s (%h)' "$PREV..HEAD" > CHANGELOG.md
+          fi
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          generate_release_notes: true

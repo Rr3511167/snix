@@ -1,0 +1,44 @@
+# Build artifacts
+/snix
+/snix.exe
+/dist/
+/build/
+
+# Staged WinDivert (downloaded at build time, not committed)
+/WinDivert.dll
+/WinDivert64.sys
+
+# Go
+*.test
+*.out
+*.prof
+coverage.out
+coverage.html
+/vendor/
+
+# Local config the tests or user might produce
+/config.yaml
+/config.json
+/snix-test*.yaml
+/test-*.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# mkdocs build output
+/site/
+
+# secrets — never commit
+minisign.key
+snix-secret.key
+*.pem
+*.key
+!testdata/*.key

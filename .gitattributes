@@ -1,0 +1,46 @@
+# Normalise line endings in the repo.
+# Everything text-like goes in as LF. This protects:
+#   - install.sh, which MUST be LF wherever it runs
+#   - GitHub Actions YAML, parsed on Linux runners
+#   - Go source files (gofmt produces LF anyway)
+#   - Markdown, YAML, JSON
+#
+# Binary files are explicitly marked so git never tries to normalise them.
+
+*           text=auto eol=lf
+
+# Shell + scripts: always LF, even if checked out on Windows.
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.py        text eol=lf
+*.js        text eol=lf
+
+# Go source + module files.
+*.go        text eol=lf
+go.mod      text eol=lf
+go.sum      text eol=lf
+
+# Docs + config.
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.json      text eol=lf
+*.toml      text eol=lf
+
+# Inno Setup .iss is edited on Windows by ISCC; keep CRLF.
+*.iss       text eol=crlf
+
+# Binaries: never touch.
+*.dll       binary
+*.sys       binary
+*.exe       binary
+*.png       binary
+*.jpg       binary
+*.zip       binary
+*.tar.gz    binary
+
+# Don't export editor/CI cruft when someone runs `git archive`.
+.gitattributes              export-ignore
+.github/                    export-ignore
+installer/                  export-ignore
+test/                       export-ignore
