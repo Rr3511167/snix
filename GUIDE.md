@@ -672,8 +672,11 @@ Now install snix on the same device where you installed the proxy client.
 ### D1. Linux (one-liner)
 
 ```bash
-curl -fsSL https://get.snix.sh | sudo sh
+curl -fsSL https://raw.githubusercontent.com/SamNet-dev/snix/main/installer/linux/install.sh | sudo sh
 ```
+
+A shorter `https://get.snix.sh` alias is planned once the domain is
+registered. Until then, use the raw GitHub URL above.
 
 Verifies the signature, installs `/usr/local/bin/snix`, adds a systemd
 service (disabled by default), bash/zsh completions.

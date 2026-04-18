@@ -1,7 +1,11 @@
 #!/bin/sh
 # snix installer.
 #
-#   curl -fsSL https://get.snix.sh | sudo sh
+# Usage (canonical):
+#   curl -fsSL https://raw.githubusercontent.com/SamNet-dev/snix/main/installer/linux/install.sh | sudo sh
+#
+# A shorter `https://get.snix.sh` alias is planned once the domain is
+# registered.
 #
 # Does:
 #   - detect distro + arch
@@ -46,7 +50,7 @@ die()   { warn "$*"; exit 1; }
 
 # -- preflight --------------------------------------------------------------
 
-[ "$(id -u)" -eq 0 ] || die "please run as root (sudo sh -c 'curl -fsSL https://get.snix.sh | sh')"
+[ "$(id -u)" -eq 0 ] || die "please run as root (sudo sh -c 'curl -fsSL https://raw.githubusercontent.com/SamNet-dev/snix/main/installer/linux/install.sh | sh')"
 
 need() {
   command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"
