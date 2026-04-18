@@ -50,6 +50,24 @@ die()   { warn "$*"; exit 1; }
 
 # -- preflight --------------------------------------------------------------
 
+# Termux / Android guard.
+# snix needs root + iptables + NFQUEUE. Android userspace does not expose
+# any of those, and Termux's PREFIX is not /usr/local/*. Fail fast with a
+# clear message instead of installing into a path Android will reject.
+# A native Android app (VpnService-based) is on the roadmap.
+is_termux=""
+[ -n "${TERMUX_VERSION:-}" ] && is_termux=1
+case "${PREFIX:-}" in
+  */com.termux/*) is_termux=1 ;;
+esac
+if [ -n "$is_termux" ]; then
+  die "Termux / Android is not supported. snix needs root + iptables + NFQUEUE, which Android userspace does not expose. A native Android app is on the roadmap — see https://github.com/SamNet-dev/snix. For now, run snix on a Linux VPS or desktop."
+fi
+# Additional Android-via-root checks (some custom ROMs / rooted phones).
+if [ -f /system/build.prop ] || [ -d /system/app ]; then
+  die "Android detected (not supported). A native Android app is on the roadmap; for now run snix on a Linux VPS or desktop."
+fi
+
 [ "$(id -u)" -eq 0 ] || die "please run as root (sudo sh -c 'curl -fsSL https://raw.githubusercontent.com/SamNet-dev/snix/main/installer/linux/install.sh | sh')"
 
 need() {
@@ -58,6 +76,7 @@ need() {
 need curl
 need tar
 need uname
+need install
 
 # -- detect os + arch -------------------------------------------------------
 
@@ -141,6 +160,9 @@ if [ ! -f "$tmp/$BINARY" ]; then
 fi
 
 info "installing $BINARY to $INSTALL_DIR"
+# Ensure the target dir exists; some minimal images (containers, fresh VMs)
+# don't ship /usr/local/bin by default.
+mkdir -p "$INSTALL_DIR"
 install -m 0755 "$tmp/$BINARY" "$INSTALL_DIR/$BINARY"
 
 # -- systemd unit (optional) -----------------------------------------------
